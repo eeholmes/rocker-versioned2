@@ -55,10 +55,34 @@ FROM docker.io/library/buildpack-deps:jammy
   ENV KERNEL_PYTHON_PREFIX=${NB_PYTHON_PREFIX}
   # Special case PATH
   ENV PATH=${NB_PYTHON_PREFIX}/bin:${CONDA_DIR}/bin:${NPM_DIR}/bin:${PATH}
+
+  # Set up repo dir
+  USER root
+  ENV REPO_DIR="/srv/repo"
+  # Create a folder and grant the user permissions if it doesn't exist
+  RUN if [ ! -d "${REPO_DIR}" ]; then \
+          /usr/bin/install -o ${NB_USER} -g ${NB_USER} -d "${REPO_DIR}"; \
+      fi
+  WORKDIR ${REPO_DIR}
+  RUN chown ${NB_USER}:${NB_USER} ${REPO_DIR}
+  # Copy stuff.
+  COPY --chown=1000:1000 . ${REPO_DIR}/
+ 
+  # Appendix:
+  ENV R_VERSION="4.4.1"
+  ENV R_HOME="/usr/local/lib/R"
+  ENV TZ="Etc/UTC"
+  RUN mkdir /rocker_scripts && \
+    cp ${REPO_DIR}/scripts/install_R_source.sh /rocker_scripts/install_R_source.sh && \
+    chmod +x /rocker_scripts/install_R_source.sh && \
+    cd / && \
+    /rocker_scripts/install_R_source.sh
+  # Revert to default user
+  USER ${NB_USER} 
   # If scripts required during build are present, copy them
   COPY --chown=1000:1000 dockerfiles/activate-conda.sh /etc/profile.d/activate-conda.sh
   COPY --chown=1000:1000 dockerfiles/env.lock /tmp/env/environment.lock
-  COPY --chown=1000:1000 dockerfiles/install-base-env2.bash /tmp/install-base-env.bash
+  COPY --chown=1000:1000 dockerfiles/install-base-env.bash /tmp/install-base-env.bash
   RUN chmod +x /etc/profile.d/activate-conda.sh
   RUN chmod +x /tmp/install-base-env.bash
   RUN TIMEFORMAT='time: %3R' \
@@ -68,13 +92,6 @@ FROM docker.io/library/buildpack-deps:jammy
   chown -R ${NB_USER}:${NB_USER} ${NPM_DIR}
   # ensure root user after build scripts
   USER root
-  ENV REPO_DIR="/srv/repo"
-  # Create a folder and grant the user permissions if it doesn't exist
-  RUN if [ ! -d "${REPO_DIR}" ]; then \
-          /usr/bin/install -o ${NB_USER} -g ${NB_USER} -d "${REPO_DIR}"; \
-      fi
-  WORKDIR ${REPO_DIR}
-  RUN chown ${NB_USER}:${NB_USER} ${REPO_DIR}
   # We want to allow two things:
   #   1. If there's a .local/bin directory in the repo, things there
   #      should automatically be in path
@@ -92,8 +109,6 @@ FROM docker.io/library/buildpack-deps:jammy
   # example installing APT packages.
   # ensure root user after preassemble scripts
   USER root
-  # Copy stuff.
-  COPY --chown=1000:1000 . ${REPO_DIR}/
   # Run assemble scripts! These will actually turn the specification
   # in the repository into an image.
   # Container image Labels!
@@ -108,17 +123,3 @@ FROM docker.io/library/buildpack-deps:jammy
   ENV PYTHONUNBUFFERED=1
   # Specify the default command to run
   CMD ["jupyter", "notebook", "--ip", "0.0.0.0"]
-  # Appendix:
-  # Re-enable man pages disabled in Ubuntu 18 minimal image
-  # https://wiki.ubuntu.com/Minimal
-  USER root
-  ENV R_VERSION="4.4.1"
-  ENV R_HOME="/usr/local/lib/R"
-  ENV TZ="Etc/UTC"
-  RUN mkdir /rocker_scripts && \
-    cp ${REPO_DIR}/scripts/install_R_source.sh /rocker_scripts/install_R_source.sh && \
-    chmod +x /rocker_scripts/install_R_source.sh && \
-    cd / && \
-    /rocker_scripts/install_R_source.sh
-  # Revert to default user
-  USER ${NB_USER}

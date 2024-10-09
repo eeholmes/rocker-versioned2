@@ -1,4 +1,4 @@
-FROM docker.io/library/ubuntu:jammy
+FROM docker.io/buildpack-deps:jammy
 
 ENV R_VERSION="4.4.1"
 ENV R_HOME="/usr/local/lib/R"
