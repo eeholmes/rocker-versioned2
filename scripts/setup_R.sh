@@ -7,7 +7,7 @@
 ## In order of preference, first argument of the script, the CRAN variable.
 ## ex. https://cloud.r-project.org, https://cran.r-project.org
 
-set -e
+set +e
 
 CRAN=${1:-${CRAN:-"https://cran.r-project.org"}}
 PURGE_BUILDDEPS=${PURGE_BUILDDEPS:-"true"}
